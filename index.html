@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Portfolio</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+    }
+
+    a {
+      color: #38bdf8;
+      text-decoration: none;
+      transition: color 0.3s;
+    }
+    a:hover {
+      color: #facc15;
+    }
+
+    @keyframes fadeSlideIn {
+      0% { opacity: 0; transform: translateY(-30px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeUp {
+      0% { opacity: 0; transform: translateY(30px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.9); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2rem 3rem;
+      background-color: #1e293b;
+      flex-wrap: wrap;
+      animation: fadeSlideIn 1s ease-out forwards;
+    }
+
+    .left-content {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .profile-pic {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 4px solid #38bdf8;
+      animation: popIn 1s ease-in-out forwards;
+    }
+
+    .text-info h1 {
+      font-size: 2.5rem;
+      color: #38bdf8;
+    }
+
+    .role, #typed-text {
+      font-size: 1.1rem;
+      color: #facc15;
+      margin-top: 0.3rem;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      font-weight: 600;
+      font-size: 1rem;
+      color: #f8fafc;
+      position: relative;
+      padding-bottom: 4px;
+      transition: color 0.3s;
+    }
+
+    .nav-links a::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      height: 2px;
+      width: 0%;
+      background-color: #facc15;
+      transition: width 0.3s ease;
+    }
+
+    .nav-links a:hover::after {
+      width: 100%;
+    }
+
+    section {
+      padding: 4rem 2rem;
+      max-width: 1000px;
+      margin: auto;
+      opacity: 0;
+      transform: translateY(30px);
+      animation: fadeUp 1s ease forwards;
+      animation-delay: 0.3s;
+      animation-fill-mode: forwards;
+    }
+
+    section h2 {
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
+      color: #facc15;
+    }
+
+    .skills-container {
+      display: flex;
+      gap: 3rem;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      animation: popIn 1.2s ease forwards;
+    }
+
+    .skill-box, .tools-box {
+      flex: 1 1 45%;
+      background: #1e293b;
+      padding: 1.5rem;
+      border-radius: 10px;
+      transition: all 0.3s ease-in-out;
+    }
+
+    .skill-box:hover,
+    .tools-box:hover {
+      transform: scale(1.03);
+      box-shadow: 0 8px 20px rgba(56, 189, 248, 0.25);
+    }
+
+    .skill-box h3, .tools-box h3 {
+      color: #38bdf8;
+      margin-bottom: 1rem;
+    }
+
+    ul {
+      list-style: disc;
+      margin-left: 1.5rem;
+      line-height: 2;
+    }
+
+    #feedback-link a {
+      font-size: 1.1rem;
+      color: #38bdf8;
+      border-bottom: 2px solid transparent;
+      transition: all 0.3s;
+    }
+
+    #feedback-link a:hover {
+      color: #facc15;
+      border-bottom: 2px solid #facc15;
+    }
+
+    .popup-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+
+    .popup-box {
+      background: #1e293b;
+      padding: 2rem;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 500px;
+      position: relative;
+    }
+
+    .popup-box input, .popup-box textarea {
+      width: 100%;
+      padding: 0.8rem;
+      margin-bottom: 1rem;
+      border-radius: 5px;
+      border: none;
+      font-size: 1rem;
+    }
+
+    .popup-box button {
+      background: #38bdf8;
+      color: #0f172a;
+      padding: 0.7rem 1.2rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .popup-box #popup-cancel {
+      background: #f87171;
+      color: #fff;
+      margin-left: 1rem;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 1.2rem;
+      background: none;
+      border: none;
+      color: #f8fafc;
+      cursor: pointer;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      background: #1e293b;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hero">
+    <div class="left-content">
+      <img src="profile.jpg" alt="Profile" class="profile-pic" />
+      <div class="text-info">
+        <h1>Sampathkumar</h1>
+        <div id="typed-text" class="role"></div>
+      </div>
+    </div>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="project.html">Projects</a>
+      <a href="contact.html">Contact</a>
+    </div>
+  </div>
+
+  <section id="about">
+    <h2>Objective</h2>
+    <p>Seeking an entry-level role in the engineering domain to leverage my technical skills, academic background, and passion for innovation in a real-world setting. To explore and grow in the field of engineering by applying theoretical concepts to practical problems, while contributing positively to team and project goals. To pursue a position that allows me to apply my engineering knowledge in real-world scenarios, improve my technical proficiency, and make meaningful contributions.</p>
+  </section>
+
+  <section id="skills">
+    <h2>Skills</h2>
+    <div class="skills-container">
+      <div class="skill-box">
+        <h3>Technical Skills</h3>
+        <ul>
+          <li>C, Java, Python, JavaScript</li>
+          <li>Embedded System</li>
+          <li>VLSI design, verification</li>
+          <li>Microcontroller - AT89s52, 8086, 8051</li>
+          <li>Machine Learning</li>
+          <li>Web Development</li>
+        </ul>
+      </div>
+      <div class="skill-box">
+        <h3>Soft Skills</h3>
+        <ul>
+          <li>Problem Solving</li>
+          <li>Critical Thinking</li>
+          <li>Communication</li>
+          <li>Adaptability</li>
+          <li>Time Management</li>
+          <li>Leadership & Initiative</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="tools">
+    <h2>Tools Known</h2>
+    <div class="tools-box">
+      <ul>
+        <li>Visual Studio Code</li>
+        <li>Git, GitHub, Git Bash</li>
+        <li>Google Colab</li>
+        <li>MongoDB</li>
+        <li>Figma, Canva</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="feedback-link" style="text-align: center; margin-top: 2rem;">
+    <a href="#" id="open-popup">➤ Give Feedback</a>
+  </section>
+
+  <div class="popup-overlay" id="popup-overlay">
+    <div class="popup-box">
+      <button class="close-btn" id="close-popup">✖</button>
+      <h2>Send Feedback</h2>
+      <input type="text" placeholder="Your Name" id="nameInput" />
+      <input type="email" placeholder="Your Email" id="emailInput" />
+      <textarea placeholder="Your Feedback" id="feedbackInput"></textarea>
+      <div style="display: flex; justify-content: flex-end;">
+        <button id="submit-btn">Submit</button>
+        <button id="popup-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>© 2025 Dark Prince. All rights reserved.</footer>
+
+  <!-- Typed.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/typed.js@2.0.12"></script>
+
+  <script>
+    const popupOverlay = document.getElementById("popup-overlay");
+    const openPopup = document.getElementById("open-popup");
+    const closePopup = document.getElementById("close-popup");
+    const cancelPopup = document.getElementById("popup-cancel");
+    const submitBtn = document.getElementById("submit-btn");
+
+    openPopup.addEventListener("click", (e) => {
+      e.preventDefault();
+      popupOverlay.style.display = "flex";
+    });
+
+    closePopup.addEventListener("click", () => popupOverlay.style.display = "none");
+    cancelPopup.addEventListener("click", () => popupOverlay.style.display = "none");
+
+    submitBtn.addEventListener("click", () => {
+      alert("Thanks for your feedback!");
+      document.getElementById("nameInput").value = "";
+      document.getElementById("emailInput").value = "";
+      document.getElementById("feedbackInput").value = "";
+      popupOverlay.style.display = "none";
+    });
+
+    window.addEventListener("click", (e) => {
+      if (e.target === popupOverlay) popupOverlay.style.display = "none";
+    });
+
+    // Typed.js animated role
+    var typed = new Typed("#typed-text", {
+      strings: ["VLSI Engineer", "Embedded Engineer", "PCB designer","Software Developer"],
+      typeSpeed: 60,
+      backSpeed: 40,
+      loop: true,
+      showCursor: false
+    });
+  </script>
+
+</body>
+</html>
