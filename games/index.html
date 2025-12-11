@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Target Shooter — HTML5</title>
+<style>
+  :root{--bg:#071124;--panel:#0e1622;--accent:#ffd166;--muted:#9aa7bf}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:#e6eef8}
+  .wrap{max-width:1100px;margin:18px auto;padding:12px;border-radius:10px;background:linear-gradient(180deg,var(--panel),#081427);box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  h1{font-size:18px;margin:0}
+  #main{display:flex;gap:12px;margin-top:12px}
+  canvas{background:linear-gradient(180deg,#052034,#071b2b);border-radius:8px;display:block}
+  .side{width:320px;display:flex;flex-direction:column;gap:12px}
+  .card{background:rgba(255,255,255,0.03);padding:10px;border-radius:8px}
+  .hud-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  button{padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit;cursor:pointer}
+  .weapon-btn{width:100%;text-align:left}
+  .kills{max-height:140px;overflow:auto;font-size:13px}
+  .chat-log{height:160px;overflow:auto;background:rgba(0,0,0,0.12);padding:6px;border-radius:6px}
+  input[type=text]{width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
+  select{padding:6px;border-radius:6px;background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit}
+  small{color:var(--muted)}
+  footer{margin-top:12px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Target Shooter — HTML5</h1>
+    <div class="hud-row">
+      <small>Click/tap to shoot · 1-4 switch guns · G grenade · R reload · WASD to move</small>
+    </div>
+  </header>
+
+  <div id="main">
+    <div style="flex:1">
+      <canvas id="game" width="820" height="560"></canvas>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <div class="hud-row">
+          <div>Score: <strong id="score">0</strong></div>
+          <div>Hits: <strong id="hits">0</strong></div>
+          <div>Misses: <strong id="misses">0</strong></div>
+        </div>
+        <div style="height:8px"></div>
+        <div class="hud-row">
+          <div>Weapon: <strong id="curGun">Pistol</strong></div>
+          <div>Ammo: <strong id="ammo">12/12</strong></div>
+          <div>Health: <strong id="health">100</strong></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <label>Skin:</label>
+          <select id="skinSelect">
+            <option value="teal">Teal</option>
+            <option value="orange">Orange</option>
+            <option value="purple">Purple</option>
+            <option value="lime">Lime</option>
+          </select>
+          <button id="respawnBtn">Respawn</button>
+        </div>
+
+        <div>
+          <strong>Weapons</strong>
+          <div style="height:8px"></div>
+          <div id="weapons" style="display:grid;gap:6px"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <strong>Kill Feed</strong>
+        <div class="kills" id="killFeed"></div>
+      </div>
+
+      <div class="card">
+        <strong>Local Chat</strong>
+        <div class="chat-log" id="chatLog"></div>
+        <div style="height:6px"></div>
+        <input id="chatInput" placeholder="Type message and press Enter" />
+      </div>
+    </div>
+  </div>
+
+  <footer>Single-player local demo. For online multiplayer / rooms & deployment I can provide a server + hosting steps.</footer>
+</div>
+
+<script>
+/* ----- Game constants and state ----- */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W = canvas.width, H = canvas.height;
+
+const scoreEl = document.getElementById('score');
+const hitsEl = document.getElementById('hits');
+const missesEl = document.getElementById('misses');
+const curGunEl = document.getElementById('curGun');
+const ammoEl = document.getElementById('ammo');
+const healthEl = document.getElementById('health');
+const killFeed = document.getElementById('killFeed');
+const weaponsDiv = document.getElementById('weapons');
+const skinSelect = document.getElementById('skinSelect');
+const respawnBtn = document.getElementById('respawnBtn');
+const chatLog = document.getElementById('chatLog');
+const chatInput = document.getElementById('chatInput');
+
+function now(){ return performance.now(); }
+
+/* Player */
+const player = {
+  x: W/2, y: H/2, r: 16, color: 'teal', speed: 180, angle:0,
+  hp: 100, alive: true
+};
+
+/* Weapons */
+const weapons = [
+  {id:'pistol', name:'Pistol', fireRate:300, bulletSpeed:900, mag:12, ammo:12, reload:900, dmg:1, pellets:1},
+  {id:'smg', name:'SMG', fireRate:90, bulletSpeed:1100, mag:30, ammo:30, reload:1200, dmg:1, pellets:1},
+  {id:'shotgun', name:'Shotgun', fireRate:600, bulletSpeed:700, mag:6, ammo:6, reload:1400, dmg:1, pellets:6, spread:0.45},
+  {id:'sniper', name:'Sniper', fireRate:900, bulletSpeed:2200, mag:5, ammo:5, reload:2000, dmg:3, pellets:1}
+];
+let curGun = 0;
+let lastShot = 0;
+let reloading = false;
+let reloadEnd = 0;
+
+/* Bullets and grenades and targets */
+const bullets = []; // {x,y,dx,dy,r,owner,dmg}
+const grenades = []; // {x,y,vx,vy,spawn,explodeAt}
+const targets = []; // AI targets {x,y,vx,vy,r,hp,points}
+let spawnTimer = 0, spawnInterval = 1200;
+
+const state = {score:0,hits:0,misses:0};
+
+/* controls */
+const keys = {w:false,a:false,s:false,d:false};
+const mouse = {x:W/2,y:H/2,down:false};
+
+/* HUD utility */
+function pushKillFeed(text){
+  const el = document.createElement('div');
+  el.textContent = text;
+  killFeed.prepend(el);
+  while(killFeed.childElementCount > 12) killFeed.removeChild(killFeed.lastChild);
+}
+
+/* Chat (local only) */
+chatInput.addEventListener('keyup', (e)=>{
+  if(e.key === 'Enter' && chatInput.value.trim()){
+    const t = document.createElement('div');
+    t.textContent = `[You] ${chatInput.value.trim()}`;
+    chatLog.appendChild(t);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    chatInput.value='';
+  }
+});
+
+/* fill weapons UI */
+function renderWeaponsList(){
+  weaponsDiv.innerHTML = '';
+  weapons.forEach((w,i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'weapon-btn';
+    btn.textContent = `${i+1} — ${w.name} (${w.ammo}/${w.mag})`;
+    btn.onclick = ()=>{ switchGun(i); };
+    weaponsDiv.appendChild(btn);
+  });
+}
+renderWeaponsList();
+
+/* map boundaries helper */
+function clampToMap(obj){
+  const margin = obj.r || 10;
+  obj.x = Math.max(margin, Math.min(W - margin, obj.x));
+  obj.y = Math.max(margin, Math.min(H - margin, obj.y));
+}
+
+/* spawn target */
+function spawnTarget(){
+  const size = 14 + Math.random()*26;
+  const edge = Math.floor(Math.random()*4);
+  let x,y,vx,vy;
+  const spd = 60 + Math.random()*110;
+  if(edge===0){ x=-size; y=Math.random()*H; vx=spd+Math.random()*80; vy=(Math.random()-0.5)*60; }
+  else if(edge===1){ x=W+size; y=Math.random()*H; vx=-(spd+Math.random()*80); vy=(Math.random()-0.5)*60; }
+  else if(edge===2){ x=Math.random()*W; y=-size; vy=spd+Math.random()*80; vx=(Math.random()-0.5)*60; }
+  else { x=Math.random()*W; y=H+size; vy=-(spd+Math.random()*80); vx=(Math.random()-0.5)*60; }
+  targets.push({x,y,vx,vy,r:size,hp:Math.ceil(size/10),points:Math.round(size)});
+}
+
+/* shooting and bullets */
+function shootTo(x,y){
+  if(!player.alive) return;
+  const g = weapons[curGun];
+  if(reloading) return;
+  const tnow = now();
+  if(tnow - lastShot < g.fireRate) return;
+  if(g.ammo <= 0){ state.misses++; pushKillFeed('Click — no ammo'); return; }
+  lastShot = tnow;
+  g.ammo--;
+  renderWeaponsList();
+  const baseAngle = Math.atan2(y - player.y, x - player.x);
+  if(g.pellets && g.pellets > 1){
+    for(let i=0;i<g.pellets;i++){
+      const ang = baseAngle + (Math.random()-0.5) * (g.spread || 0.5);
+      spawnBullet(player.x + Math.cos(ang)*18, player.y + Math.sin(ang)*18, Math.cos(ang)*g.bulletSpeed/1000, Math.sin(ang)*g.bulletSpeed/1000, 4, g.dmg);
+    }
+  } else {
+    spawnBullet(player.x + Math.cos(baseAngle)*18, player.y + Math.sin(baseAngle)*18, Math.cos(baseAngle)*g.bulletSpeed/1000, Math.sin(baseAngle)*g.bulletSpeed/1000, 4, g.dmg);
+  }
+}
+
+function spawnBullet(x,y,dx,dy,r,dmg){
+  bullets.push({x,y,dx,dy,r,dmg});
+}
+
+/* grenade: arcing projectile */
+function throwGrenade(x,y){
+  if(!player.alive) return;
+  const gx = player.x, gy = player.y;
+  const ang = Math.atan2(y - gy, x - gx);
+  const speed = 6; // pixel per frame
+  const vx = Math.cos(ang) * speed;
+  const vy = Math.sin(ang) * speed - 3; // give upward arc
+  grenades.push({x:gx, y:gy, vx, vy, spawn:now(), explodeAt: now()+1500});
+}
+
+/* reload function */
+function reload(){
+  const g = weapons[curGun];
+  if(reloading || g.ammo === g.mag) return;
+  reloading = true;
+  reloadEnd = now() + g.reload;
+}
+
+/* switch gun */
+function switchGun(i){
+  if(i < 0 || i >= weapons.length) return;
+  curGun = i;
+  reloading = false;
+}
+
+/* respawn */
+function respawnPlayer(){
+  player.x = W/2 + (Math.random()-0.5)*60;
+  player.y = H/2 + (Math.random()-0.5)*60;
+  player.hp = 100;
+  player.alive = true;
+  pushKillFeed('Player respawned');
+}
+
+/* update: movement, bullets, grenades, targets */
+function update(dt){
+  // movement
+  const spd = player.speed * (dt/1000);
+  if(keys.w) player.y -= spd;
+  if(keys.s) player.y += spd;
+  if(keys.a) player.x -= spd;
+  if(keys.d) player.x += spd;
+  clampToMap(player);
+
+  // spawn targets
+  spawnTimer += dt;
+  if(spawnTimer > spawnInterval){
+    spawnTimer = 0;
+    spawnTarget();
+    // gradually increase spawn rate
+    spawnInterval = Math.max(500, spawnInterval - 2);
+  }
+
+  // bullets update
+  for(let i=bullets.length-1;i>=0;i--){
+    const b = bullets[i];
+    b.x += b.dx * dt;
+    b.y += b.dy * dt;
+    // off-screen remove
+    if(b.x < -50 || b.x > W+50 || b.y < -50 || b.y > H+50) { bullets.splice(i,1); continue; }
+    // hit targets
+    for(let j=targets.length-1;j>=0;j--){
+      const t = targets[j];
+      const dx=b.x-t.x, dy=b.y-t.y;
+      if(dx*dx + dy*dy < (b.r + t.r)*(b.r + t.r)){
+        // hit
+        t.hp -= b.dmg;
+        bullets.splice(i,1);
+        state.hits++;
+        state.score += Math.round(t.points/2);
+        pushKillFeed(`Hit target (${t.points})`);
+        if(t.hp <= 0){
+          state.score += t.points;
+          pushKillFeed(`Target destroyed (+${t.points})`);
+          targets.splice(j,1);
+        }
+        break;
+      }
+    }
+  }
+
+  // grenades update (physics + explosion)
+  for(let i=grenades.length-1;i>=0;i--){
+    const g = grenades[i];
+    // simple gravity
+    g.vy += 0.12 * (dt/16.67);
+    g.x += g.vx * dt;
+    g.y += g.vy * dt;
+    // bounce on ground (bottom)
+    if(g.y > H - 8){
+      g.y = H - 8;
+      g.vy *= -0.5;
+      g.vx *= 0.8;
+    }
+    if(now() >= g.explodeAt){
+      // explosion: damage targets and player if in radius
+      const ex = g.x, ey = g.y, radius = 80;
+      pushKillFeed('Grenade exploded');
+      // damage targets
+      for(let j=targets.length-1;j>=0;j--){
+        const t = targets[j];
+        const dx=t.x-ex, dy=t.y-ey;
+        if(dx*dx+dy*dy < radius*radius){
+          state.score += t.points;
+          pushKillFeed(`Grenade killed target (+${t.points})`);
+          targets.splice(j,1);
+        }
+      }
+      // damage player if near
+      const dxp = player.x - ex, dyp = player.y - ey;
+      if(dxp*dxp + dyp*dyp < radius*radius){
+        player.hp -= 60;
+        pushKillFeed('You were hurt by grenade!');
+        if(player.hp <= 0){ player.alive = false; pushKillFeed('You died'); }
+      }
+      // explosion visual handled in draw
+      grenades.splice(i,1);
+      // small area-of-effect bullets (visual)
+    }
+  }
+
+  // targets update: move and possibly hit player
+  for(let i=targets.length-1;i>=0;i--){
+    const t = targets[i];
+    t.x += t.vx * dt/1000;
+    t.y += t.vy * dt/1000;
+    // remove if far away and count miss
+    if(t.x < -200 || t.x > W+200 || t.y < -200 || t.y > H+200){
+      targets.splice(i,1);
+      state.misses++;
+      continue;
+    }
+    // collision with player (damage)
+    const dx = t.x - player.x, dy = t.y - player.y;
+    if(dx*dx + dy*dy < (t.r + player.r)*(t.r + player.r)){
+      player.hp -= 10;
+      pushKillFeed('Target hit you!');
+      // push target away
+      t.vx *= -1.2; t.vy *= -1.2;
+      if(player.hp <= 0){ player.alive = false; pushKillFeed('You died'); }
+    }
+  }
+
+  // reloading finish
+  if(reloading && now() >= reloadEnd){
+    reloading = false;
+    weapons[curGun].ammo = weapons[curGun].mag;
+    renderWeaponsList();
+  }
+
+  // UI updates
+  scoreEl.textContent = state.score;
+  hitsEl.textContent = state.hits;
+  missesEl.textContent = state.misses;
+  curGunEl.textContent = weapons[curGun].name;
+  ammoEl.textContent = reloading ? 'Reloading...' : `${weapons[curGun].ammo}/${weapons[curGun].mag}`;
+  healthEl.textContent = Math.max(0, Math.round(player.hp));
+  // auto-respawn after 2s if dead
+  if(!player.alive){
+    // wait 1.6s then respawn
+    if(!player._deadSince) player._deadSince = now();
+    if(now() - player._deadSince > 1600){ player._deadSince = 0; respawnPlayer(); }
+  }
+}
+
+/* draw all */
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  // grid
+  ctx.save();
+  ctx.globalAlpha = 0.04;
+  for(let gx=0;gx<W;gx+=40) ctx.fillRect(gx,0,1,H);
+  for(let gy=0;gy<H;gy+=40) ctx.fillRect(0,gy,W,1);
+  ctx.restore();
+
+  // draw targets
+  for(const t of targets){
+    // outer
+    ctx.beginPath(); ctx.arc(t.x,t.y,t.r,0,Math.PI*2); ctx.fillStyle='#e7ebf1'; ctx.fill();
+    // bullseye
+    ctx.beginPath(); ctx.arc(t.x,t.y,t.r*0.6,0,Math.PI*2); ctx.fillStyle='#ef476f'; ctx.fill();
+    ctx.beginPath(); ctx.arc(t.x,t.y,t.r*0.3,0,Math.PI*2); ctx.fillStyle='#073b4c'; ctx.fill();
+  }
+
+  // bullets
+  for(const b of bullets){
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fillStyle='#ffd166'; ctx.fill();
+  }
+
+  // grenades (visual)
+  for(const g of grenades){
+    ctx.beginPath(); ctx.arc(g.x,g.y,8,0,Math.PI*2); ctx.fillStyle='#8ecae6'; ctx.fill();
+  }
+
+  // draw player
+  if(player.alive){
+    ctx.save(); ctx.translate(player.x, player.y);
+    // body circle (skin)
+    ctx.beginPath(); ctx.arc(0,0,player.r,0,Math.PI*2); ctx.fillStyle = skinColor(player.color); ctx.fill();
+    // gun nose
+    const ang = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+    ctx.rotate(ang);
+    ctx.fillStyle = '#06283d';
+    ctx.fillRect(8, -4, 18, 8);
+    ctx.restore();
+  } else {
+    // draw ghost
+    ctx.save(); ctx.translate(player.x, player.y);
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath(); ctx.arc(0,0,player.r,0,Math.PI*2); ctx.fillStyle='#6b7280'; ctx.fill();
+    ctx.restore();
+  }
+
+  // crosshair
+  ctx.beginPath();
+  ctx.moveTo(mouse.x-10, mouse.y); ctx.lineTo(mouse.x+10, mouse.y);
+  ctx.moveTo(mouse.x, mouse.y-10); ctx.lineTo(mouse.x, mouse.y+10);
+  ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=1.2; ctx.stroke();
+}
+
+/* helper skin color */
+function skinColor(name){
+  switch(name){
+    case 'teal': return '#06d6a0';
+    case 'orange': return '#ff9f1c';
+    case 'purple': return '#c77dff';
+    case 'lime': return '#b7f34a';
+  }
+  return '#06d6a0';
+}
+
+/* input listeners */
+canvas.addEventListener('mousemove', e=>{
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - rect.left; mouse.y = e.clientY - rect.top;
+});
+canvas.addEventListener('mousedown', e=>{
+  mouse.down = true;
+  shootTo(mouse.x, mouse.y);
+});
+canvas.addEventListener('mouseup', e=>{ mouse.down = false; });
+window.addEventListener('keydown', e=>{
+  if(e.key==='w' || e.key==='W') keys.w = true;
+  if(e.key==='a' || e.key==='A') keys.a = true;
+  if(e.key==='s' || e.key==='S') keys.s = true;
+  if(e.key==='d' || e.key==='D') keys.d = true;
+  if(e.key === 'r' || e.key === 'R') reload();
+  if(e.key === 'g' || e.key === 'G') throwGrenade(mouse.x, mouse.y);
+  if(['1','2','3','4'].includes(e.key)) switchGun(Number(e.key)-1);
+});
+window.addEventListener('keyup', e=>{
+  if(e.key==='w' || e.key==='W') keys.w = false;
+  if(e.key==='a' || e.key==='A') keys.a = false;
+  if(e.key==='s' || e.key==='S') keys.s = false;
+  if(e.key==='d' || e.key==='D') keys.d = false;
+});
+
+/* skin change */
+skinSelect.addEventListener('change', ()=>{ player.color = skinSelect.value; });
+
+respawnBtn.addEventListener('click', ()=>{ respawnPlayer(); });
+
+/* game loop */
+let last = performance.now();
+function gameLoop(ts){
+  const dt = ts - last; last = ts;
+  update(dt);
+  // allow auto-fire for certain weapons if mouse held
+  if(mouse.down && player.alive){
+    const g = weapons[curGun];
+    const tnow = now();
+    if(tnow - lastShot >= g.fireRate) shootTo(mouse.x, mouse.y);
+  }
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+/* init */
+function init(){
+  // ensure copy of mags
+  weapons.forEach(w=> w.ammo = w.mag);
+  renderWeaponsList();
+  pushKillFeed('Game ready');
+}
+init();
+
+/* debug: resize behaviour */
+window.addEventListener('resize', ()=>{
+  // keep canvas fixed size for now
+  // You can scale canvas to window if desired.
+});
+
+/* Preventing favicon 404 in some editors: no operation */
+</script>
+</body>
+</html>
